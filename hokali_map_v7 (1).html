@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HOKALI — California District Map</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@v7.5.2/ol.css">
+<script src="https://cdn.jsdelivr.net/npm/ol@v7.5.2/dist/ol.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; font-family: 'Inter', sans-serif; background: #f0f4f8; color: #1e2d3d; }
+  body { display: flex; flex-direction: column; overflow: hidden; }
+  header { background: #1A3C5E; padding: 10px 20px; display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #2a5a8a; flex-shrink: 0; gap: 12px; }
+  .logo { font-weight: 700; font-size: 17px; color: #fff; white-space: nowrap; }
+  .logo span { color: #5cb8ff; }
+  .hstats { display: flex; gap: 20px; }
+  .stat { text-align: center; }
+  .stat-n { font-size: 18px; font-weight: 700; }
+  .stat-l { font-size: 9px; color: #8ab4d4; text-transform: uppercase; letter-spacing: 0.05em; }
+  .live-badge { font-size: 10px; color: #4ade80; border: 1px solid #4ade80; border-radius: 10px; padding: 2px 8px; white-space: nowrap; align-self: center; }
+  .live-badge.loading { color: #fbbf24; border-color: #fbbf24; }
+  .live-badge.fallback { color: #f87171; border-color: #f87171; }
+  .main { display: flex; flex: 1; overflow: hidden; }
+  .sidebar { width: 285px; min-width: 285px; background: #fff; border-right: 1px solid #d1dce8; display: flex; flex-direction: column; overflow: hidden; }
+  .sb-sec { padding: 11px 13px; border-bottom: 1px solid #e8eef4; }
+  .sb-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #1A3C5E; margin-bottom: 7px; }
+  .frow { display: flex; flex-wrap: wrap; gap: 4px; }
+  .fb { font-family: 'Inter', sans-serif; font-size: 11px; padding: 3px 9px; border-radius: 12px; border: 1px solid #c8d8e8; cursor: pointer; background: #f0f4f8; color: #6b8aaa; transition: all 0.12s; }
+  .fb:hover { background: #dce8f4; color: #1A3C5E; }
+  .fb.on { color: #fff; }
+  .fb.s-Active.on  { background:#16a34a; border-color:#16a34a; }
+  .fb.s-lead.on    { background:#d97706; border-color:#d97706; }
+  .fb.s-norepur.on { background:#ea580c; border-color:#ea580c; }
+  .fb.s-Lost.on    { background:#dc2626; border-color:#dc2626; }
+  .fb.ae-Thibaut.on,.fb.ae-Manuel.on,.fb.ae-Sagui.on,.fb.ae-Santi.on { background:#1A3C5E; border-color:#1A3C5E; }
+  .fb.ae-other.on  { background:#64748b; border-color:#64748b; }
+  .search-wrap { padding: 9px 13px; border-bottom: 1px solid #e8eef4; }
+  .si { width: 100%; background: #f0f4f8; border: 1px solid #c8d8e8; border-radius: 6px; padding: 6px 10px; font-family: 'Inter', sans-serif; font-size: 12px; color: #1e2d3d; outline: none; }
+  .si::placeholder { color: #94a3b8; }
+  .si:focus { border-color: #1A3C5E; }
+  .lcount { padding: 5px 13px; font-size: 10px; color: #94a3b8; flex-shrink: 0; }
+  .geocoding-bar { padding: 4px 13px; font-size: 10px; color: #d97706; background: #fffbeb; border-bottom: 1px solid #fde68a; display: none; }
+  .dlist { flex: 1; overflow-y: auto; }
+  .dlist::-webkit-scrollbar { width: 4px; }
+  .dlist::-webkit-scrollbar-thumb { background: #c8d8e8; border-radius: 2px; }
+  .di { padding: 8px 13px; cursor: pointer; border-left: 3px solid transparent; border-bottom: 1px solid #f0f4f8; }
+  .di:hover { background: #f7fafc; }
+  .di.sel { background: #eaf2fb; border-left-color: #1A3C5E; }
+  .dn { font-size: 12px; font-weight: 500; color: #1e2d3d; line-height: 1.3; }
+  .dm { display: flex; align-items: center; gap: 5px; margin-top: 2px; }
+  .sdot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .dtag { font-size: 10px; color: #94a3b8; }
+  .map-wrap { flex: 1; position: relative; }
+  #map { width: 100%; height: 100%; }
+  .legend { position: absolute; bottom: 20px; right: 12px; z-index: 999; background: rgba(255,255,255,0.95); border: 1px solid #d1dce8; border-radius: 8px; padding: 10px 14px; pointer-events: none; box-shadow: 0 2px 12px rgba(0,0,0,0.1); }
+  .leg-title { font-size: 10px; font-weight: 700; color: #1A3C5E; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 7px; }
+  .leg-row { display: flex; align-items: center; gap: 7px; font-size: 11px; color: #334155; margin-bottom: 4px; }
+  .ldot { width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0; }
+  .ol-popup { position: absolute; background: #fff; border: 1px solid #d1dce8; border-radius: 8px; padding: 10px 14px; min-width: 210px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); pointer-events: none; transform: translate(-50%, calc(-100% - 14px)); }
+  .ol-popup:after { content: ''; position: absolute; bottom: -8px; left: 50%; transform: translateX(-50%); border: 8px solid transparent; border-top-color: #d1dce8; border-bottom: 0; }
+  .pop-name { font-size: 13px; font-weight: 700; color: #1e2d3d; margin-bottom: 5px; line-height: 1.3; }
+  .pop-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 700; margin-bottom: 6px; }
+  .pop-row { font-size: 11px; color: #64748b; margin-top: 4px; display: flex; align-items: center; gap: 5px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">HOKALI <span>District Map</span></div>
+  <div class="hstats" id="hstats"></div>
+  <div class="live-badge loading" id="liveBadge">&#8987; Loading&#8230;</div>
+</header>
+<div class="main">
+  <div class="sidebar">
+    <div class="sb-sec"><div class="sb-title">Filter by Status</div><div class="frow" id="sf"></div></div>
+    <div class="sb-sec"><div class="sb-title">Filter by AE</div><div class="frow" id="af"></div></div>
+    <div class="search-wrap"><input class="si" id="si" type="text" placeholder="Search district..."></div>
+    <div class="lcount" id="lc">Loading&#8230;</div>
+    <div class="geocoding-bar" id="geoBar"></div>
+    <div class="dlist" id="dl"></div>
+  </div>
+  <div class="map-wrap">
+    <div id="map"></div>
+    <div id="popup" class="ol-popup" style="display:none"></div>
+    <div class="legend">
+      <div class="leg-title">Status</div>
+      <div class="leg-row"><div class="ldot" style="background:#16a34a"></div>Active</div>
+      <div class="leg-row"><div class="ldot" style="background:#d97706"></div>Lead in conv</div>
+      <div class="leg-row"><div class="ldot" style="background:#ea580c"></div>No Repurchase</div>
+      <div class="leg-row"><div class="ldot" style="background:#dc2626"></div>Lost</div>
+    </div>
+  </div>
+</div>
+<script>
+var CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQWrjGxqYAmbpHLz7nPTQyYIiy69sSdRkGCtEu8v16X48Ih4cjCX46w8hHSsXI_PsRp0t6gVQMg3XBt/pub?gid=595381660&single=true&output=csv';
+var CA_AREAS = ['los angeles','san francisco bay area','california others','fresno','modesto','sacramento','san diego'];
+var GEO_CACHE_KEY = 'hokali_geo_cache_v1';
+
+var ADDRESSES = {'Moreno Valley Unified School District':'25634 Alessandro Blvd, Moreno Valley, CA 92553','Temecula Valley Unified School District':'31350 Rancho Vista Rd, Temecula, CA 92592','Eastside Union School District':'45012 Sierra Hwy, Lancaster, CA 93534','Corona Norco Unified School District':'2820 Clark Ave, Norco, CA 92860','Dublin Unified School District':'7471 Larkdale Ave, Dublin, CA 94568','Val Verde Unified School District':'975 W Morgan St, Perris, CA 92571','San Francisco Unified School District':'555 Franklin St, San Francisco, CA 94102','Los Angeles Unified School District':'333 S Beaudry Ave, Los Angeles, CA 90017','Oakland Unified School District':'1000 Broadway, Oakland, CA 94607','Alum Rock Unified School District':'2930 Gay Ave, San Jose, CA 95127','Amethod Public Schools':'2023 Broadway, Oakland, CA 94612','Cowchilla Elementary School District':'740 W Drove Ave, Chowchilla, CA 93610','West Contra Costa Unified School District':'1108 Bissell Ave, Richmond, CA 94801','Valor Academy Elementary':'13000 Raymer St, North Hollywood, CA 91605','Tustin Unified School District':'300 S C St, Tustin, CA 92780','Sunnyvale School District':'819 W Iowa Ave, Sunnyvale, CA 94086','Dinuba Unified School District':'1327 E El Monte Way, Dinuba, CA 93618','Education For Change Public Schools':'1970 Broadway, Suite 240, Oakland, CA 94612','Fremont Unified School District':'4210 Technology Dr, Fremont, CA 94538','Morgan Hill Unified School District':'15600 Concord Circle, Morgan Hill, CA 95037','Fullerton Unified School District':'1401 W Valencia Dr, Fullerton, CA 92833','Hayward Unified School District':'24411 Amador St, Hayward, CA 94544','John Swett Unified School District':'400 Alhambra Ave, Martinez, CA 94553','KIPP Heritage Academy':'375 N White Rd, San Jose, CA 95127','KIPP Empower Academy':'2812 S Hoover St, Los Angeles, CA 90007','Livermore Valley Joint Unified School District':'685 E Jack London Blvd, Livermore, CA 94551','Mill Valley Elementary School District':'411 Sycamore Ave, Mill Valley, CA 94941','Mountain View School District':'3320 Gilman Rd, El Monte, CA 91732','Mt. Diablo Unified School District':'1936 Carlotta Dr, Concord, CA 94519','Mt. Pleasant Elementary School District':'3210 McKee Rd, San Jose, CA 95127','Natomas Unified School District':'1901 Arena Blvd, Sacramento, CA 95834','Oceanside Unified School District':'2111 Mission Ave, Oceanside, CA 92058','Pacifica School District':'375 Reina Del Mar Ave, Pacifica, CA 94044','Magnolia Public Schools':'17355 Chatsworth St, Granada Hills, CA 91344','Palmdale School District':'39139 N 10th St E, Palmdale, CA 93550','Rosemead School District':'3907 Rosemead Blvd, Rosemead, CA 91770','Pasadena Unified School District':'351 S Hudson Ave, Pasadena, CA 91101','San Bruno Park School District':'500 Acacia Ave, San Bruno, CA 94066','San Diego Unified School District':'4100 Normal St, San Diego, CA 92103','San Jose Unified School District':'855 Lenzen Ave, San Jose, CA 95126','San Mateo-Foster City School District':'1170 Chess Dr, Foster City, CA 94404','Caliber Public Schools':'1220 Valle Vista Ave, Vallejo, CA 94589','VAUGHN Next Century Learning Center':'13330 Vaughn St, San Fernando, CA 91340','Westminster School District':'14121 Cedarwood Ave, Westminster, CA 92683','Fresno Unified School District':'2309 Tulare St, Fresno, CA 93721','Ventura Unified School District':'255 W Stanley Ave, Ventura, CA 93001','Lemon Grove School District':'8025 Lincoln St, Lemon Grove, CA 91945','Fairfield-Suisun Unified School District':'2490 Hilborn Rd, Fairfield, CA 94534','Adelanto Elementary School District':'11824 Air Expressway, Adelanto, CA 92301','Albert Einstein Academies':'4343 Campus Ave, San Diego, CA 92103','Fresno County Superintendent of Schools':'1111 Van Ness Ave, Fresno, CA 93721','Vallejo City Unified School District':'665 Walnut Ave, Vallejo, CA 94592','Soledad Unified School District':'1261 Metz Rd, Soledad, CA 93960','Firebaugh-Las Deltas Unified School District':'1976 Morris Kyle Dr, Firebaugh, CA 93622','ABC Unified School District':'16700 Norwalk Blvd, Cerritos, CA 90703','Monterey Peninsula Unified School District':'700 Pacific St, Monterey, CA 93940','Empire Union School District':'116 N McClure Rd, Modesto, CA 95357','Chula Vista Elementary School District':'84 E J St, Chula Vista, CA 91910','Western Placer Unified School District':'600 6th St, Lincoln, CA 95648','Twin Rivers Unified School District':'5115 Dudley Blvd, McClellan, CA 95652','Elk Grove Unified School District':'9510 Elk Grove-Florin Rd, Elk Grove, CA 95624','Glendora Unified School District':'500 N Loraine Ave, Glendora, CA 91741','Inglewood Unified School District':'401 S Inglewood Ave, Inglewood, CA 90301','ISANA Academies':'14709 Polk St, Sylmar, CA 91342','Alvord Unified School District':'9 MacKay Ct, Riverside, CA 92507','Bellflower Unified School District':'16703 S Clark Ave, Bellflower, CA 90706','Shiloh Elementary School District':'3765 Shiloh Rd, Redding, CA 96002','Murrieta Valley Unified School District':'41870 McAlby Ct, Murrieta, CA 92562','Visalia Unified School District':'5000 W Cypress Ave, Visalia, CA 93277','San Juan Unified School District':'3738 Walnut Ave, Carmichael, CA 95608','Stockton Unified School District':'701 N Madison St, Stockton, CA 95202','Compton Unified School District':'501 S Santa Fe Ave, Compton, CA 90221','Torrance Unified School District':'2335 Plaza Del Amo, Torrance, CA 90501','Campbell Union School District':'155 N 3rd St, Campbell, CA 95008','Aspire Public Schools LA':'1231 E 46th St, Los Angeles, CA 90011','Greenfield Union School District':'1624 Fairview Rd, Bakersfield, CA 93307','Cuyama Joint Unified School District':'4400 Primero School Rd, New Cuyama, CA 93254','Goleta Union School District':'401 N Fairview Ave, Goleta, CA 93117','Rim of the World Unified School District':'27315 N Bay Rd, Blue Jay, CA 92317','Rio School District':'1760 Cesar Chavez Dr, Oxnard, CA 93030','Tehachapi Unified School District':'300 S Robinson St, Tehachapi, CA 93561','South Whittier School District':'14114 Cowan Ave, Whittier, CA 90604','Strawberry Recreation Center':'118 E Strawberry Dr, Mill Valley, CA 94941','Town of San Anselmo':'525 San Anselmo Ave, San Anselmo, CA 94960','Reed Union School District':'277 Happy Hill Rd, Tiburon, CA 94920','Aromas-San Juan Unified School District':'491 A St, San Juan Bautista, CA 95045'};
+
+var STATUS_COLORS = {Active:'#16a34a',lead:'#d97706',norepur:'#ea580c',Lost:'#dc2626'};
+var STATUS_LABELS = {Active:'Active',lead:'Lead in conv',norepur:'No Repurchase',Lost:'Lost'};
+var AE_COLORS     = {Thibaut:'#5cb8ff',Manuel:'#4ade80',Sagui:'#fbbf24',Santi:'#c084fc',other:'#94a3b8'};
+var ACTIVE_AES    = ['Manuel','Santi','Thibaut','Sagui'];
+
+var COORDS_RAW = [
+  ["Moreno Valley Unified School District",33.9425,-117.2297,"Riverside County"],
+  ["Temecula Valley Unified School District",33.4936,-117.1484,"Riverside County"],
+  ["Eastside Union School District",34.7522,-118.1369,"Los Angeles County"],
+  ["Corona Norco Unified School District",33.8753,-117.5664,"Riverside County"],
+  ["Dublin Unified School District",37.7021,-121.9358,"Alameda County"],
+  ["Val Verde Unified School District",33.8908,-117.2697,"Riverside County"],
+  ["San Francisco Unified School District",37.7749,-122.4194,"San Francisco County"],
+  ["Los Angeles Unified School District",34.0522,-118.2437,"Los Angeles County"],
+  ["Oakland Unified School District",37.8044,-122.2712,"Alameda County"],
+  ["Alum Rock Unified School District",37.3861,-121.8263,"Santa Clara County"],
+  ["Amethod Public Schools",37.8044,-122.24,"Alameda County"],
+  ["Cowchilla Elementary School District",37.0677,-120.2607,"Madera County"],
+  ["West Contra Costa Unified School District",37.9358,-122.3478,"Contra Costa County"],
+  ["Valor Academy Elementary",34.2231,-118.5648,"Los Angeles County"],
+  ["Tustin Unified School District",33.7458,-117.8231,"Orange County"],
+  ["Sunnyvale School District",37.3688,-122.0363,"Santa Clara County"],
+  ["Dinuba Unified School District",36.5433,-119.3871,"Tulare County"],
+  ["Education For Change Public Schools",37.7654,-122.2168,"Alameda County"],
+  ["Fremont Unified School District",37.5485,-121.9886,"Alameda County"],
+  ["Morgan Hill Unified School District",37.1305,-121.6544,"Santa Clara County"],
+  ["Fullerton Unified School District",33.8703,-117.9242,"Orange County"],
+  ["Hayward Unified School District",37.6688,-122.0808,"Alameda County"],
+  ["John Swett Unified School District",38.0349,-122.2302,"Contra Costa County"],
+  ["KIPP Heritage Academy",37.3382,-121.8863,"Santa Clara County"],
+  ["KIPP Empower Academy",33.9425,-118.2437,"Los Angeles County"],
+  ["Livermore Valley Joint Unified School District",37.6819,-121.7681,"Alameda County"],
+  ["Mill Valley Elementary School District",37.906,-122.545,"Marin County"],
+  ["Mountain View School District",33.92,-118.105,"Los Angeles County"],
+  ["Mt. Diablo Unified School District",37.9716,-122.0308,"Contra Costa County"],
+  ["Mt. Pleasant Elementary School District",37.327,-121.785,"Santa Clara County"],
+  ["Natomas Unified School District",38.6391,-121.5325,"Sacramento County"],
+  ["Oceanside Unified School District",33.1959,-117.3795,"San Diego County"],
+  ["Pacifica School District",37.6138,-122.4869,"San Mateo County"],
+  ["Magnolia Public Schools",33.77,-117.855,"Orange County"],
+  ["Palmdale School District",34.5794,-118.1165,"Los Angeles County"],
+  ["Rosemead School District",34.0803,-118.0725,"Los Angeles County"],
+  ["Pasadena Unified School District",34.1478,-118.1445,"Los Angeles County"],
+  ["San Bruno Park School District",37.6305,-122.4111,"San Mateo County"],
+  ["San Diego Unified School District",32.7157,-117.1611,"San Diego County"],
+  ["San Jose Unified School District",37.3382,-121.8863,"Santa Clara County"],
+  ["San Mateo-Foster City School District",37.563,-122.3255,"San Mateo County"],
+  ["Strawberry Recreation Center",37.885,-122.5063,"Marin County"],
+  ["Campbell Union School District",37.2872,-121.94,"Santa Clara County"],
+  ["Town of San Anselmo",37.9746,-122.5617,"Marin County"],
+  ["Caliber Public Schools",38.1041,-122.2566,"Solano County"],
+  ["VAUGHN Next Century Learning Center",34.2231,-118.4731,"Los Angeles County"],
+  ["Westminster School District",33.7514,-117.9939,"Orange County"],
+  ["Fresno Unified School District",36.7378,-119.7871,"Fresno County"],
+  ["Ventura Unified School District",34.275,-119.229,"Ventura County"],
+  ["Aspire Public Schools LA",34.0195,-118.3418,"Los Angeles County"],
+  ["Lemon Grove School District",32.7418,-117.0311,"San Diego County"],
+  ["Fairfield-Suisun Unified School District",38.2493,-122.04,"Solano County"],
+  ["Adelanto Elementary School District",34.5825,-117.4329,"San Bernardino County"],
+  ["Albert Einstein Academies",32.7157,-117.14,"San Diego County"],
+  ["Fresno County Superintendent of Schools",36.75,-119.77,"Fresno County"],
+  ["Vallejo City Unified School District",38.1041,-122.26,"Solano County"],
+  ["Soledad Unified School District",36.4244,-121.3266,"Monterey County"],
+  ["Firebaugh-Las Deltas Unified School District",36.856,-120.4574,"Fresno County"],
+  ["ABC Unified School District",33.8608,-118.1006,"Los Angeles County"],
+  ["City of Milpitas",37.4323,-121.8996,"Santa Clara County"],
+  ["Monterey Peninsula Unified School District",36.6002,-121.8947,"Monterey County"],
+  ["Cuyama Joint Unified School District",34.9322,-119.593,"Santa Barbara County"],
+  ["Empire Union School District",37.6335,-120.8438,"Stanislaus County"],
+  ["Chula Vista Elementary School District",32.6401,-117.0842,"San Diego County"],
+  ["Reed Union School District",37.885,-122.53,"Marin County"],
+  ["Western Placer Unified School District",38.9066,-121.2717,"Placer County"],
+  ["Goleta Union School District",34.4358,-119.8276,"Santa Barbara County"],
+  ["Tehachapi Unified School District",35.1322,-118.4487,"Kern County"],
+  ["Twin Rivers Unified School District",38.6391,-121.37,"Sacramento County"],
+  ["Elk Grove Unified School District",38.4088,-121.3716,"Sacramento County"],
+  ["Rio School District",34.2289,-119.1776,"Ventura County"],
+  ["Glendora Unified School District",34.1364,-117.8653,"Los Angeles County"],
+  ["Rim of the World Unified School District",34.2439,-117.1964,"San Bernardino County"],
+  ["Aromas-San Juan Unified School District",36.8877,-121.6319,"San Benito County"],
+  ["Inglewood Unified School District",33.9617,-118.3531,"Los Angeles County"],
+  ["South Whittier School District",33.9331,-118.0331,"Los Angeles County"],
+  ["ISANA Academies",34.0522,-118.28,"Los Angeles County"],
+  ["Alvord Unified School District",33.8753,-117.3764,"Riverside County"],
+  ["Bellflower Unified School District",33.8817,-118.117,"Los Angeles County"],
+  ["Shiloh Elementary School District",40.5865,-122.3917,"Shasta County"],
+  ["Murrieta Valley Unified School District",33.5539,-117.2139,"Riverside County"],
+  ["Visalia Unified School District",36.3302,-119.2921,"Tulare County"],
+  ["Greenfield Union School District",35.2439,-119.0172,"Kern County"],
+  ["San Juan Unified School District",38.6391,-121.4263,"Sacramento County"],
+  ["Stockton Unified School District",37.9577,-121.2908,"San Joaquin County"],
+  ["Compton Unified School District",33.8958,-118.2201,"Los Angeles County"],
+  ["Torrance Unified School District",33.8358,-118.3406,"Los Angeles County"],
+  ["Del Norte County School District",41.7558,-124.2014,"Del Norte County"]
+];
+
+var FALLBACK_RAW = [
+  ["Moreno Valley Unified School District",33.9425,-117.2297,"Riverside County","Manuel","Active"],
+  ["Temecula Valley Unified School District",33.4936,-117.1484,"Riverside County","Manuel","Inactive - lead in conv"],
+  ["Eastside Union School District",34.7522,-118.1369,"Los Angeles County","Manuel","Active"],
+  ["Corona Norco Unified School District",33.8753,-117.5664,"Riverside County","Santi","Active"],
+  ["Dublin Unified School District",37.7021,-121.9358,"Alameda County","Manuel","Lost"],
+  ["Val Verde Unified School District",33.8908,-117.2697,"Riverside County","Manuel","Inactive - lead in conv"],
+  ["San Francisco Unified School District",37.7749,-122.4194,"San Francisco County","Santi","Inactive - lead in conv"],
+  ["Los Angeles Unified School District",34.0522,-118.2437,"Los Angeles County","","Inactive - lead in conv"],
+  ["Oakland Unified School District",37.8044,-122.2712,"Alameda County","Sagui","Inactive - lead in conv"],
+  ["Alum Rock Unified School District",37.3861,-121.8263,"Santa Clara County","Thibaut","Active"],
+  ["Amethod Public Schools",37.8044,-122.24,"Alameda County","Manuel","Lost"],
+  ["Cowchilla Elementary School District",37.0677,-120.2607,"Madera County","Sofia","Inactive - lead in conv"],
+  ["West Contra Costa Unified School District",37.9358,-122.3478,"Contra Costa County","Joaco","Inactive - lead in conv"],
+  ["Valor Academy Elementary",34.2231,-118.5648,"Los Angeles County","Joaco","Inactive - lead in conv"],
+  ["Tustin Unified School District",33.7458,-117.8231,"Orange County","Manuel","Lost"],
+  ["Sunnyvale School District",37.3688,-122.0363,"Santa Clara County","Sofia","Lost"],
+  ["Dinuba Unified School District",36.5433,-119.3871,"Tulare County","Manuel","Lost"],
+  ["Education For Change Public Schools",37.7654,-122.2168,"Alameda County","Sagui","Active"],
+  ["Fremont Unified School District",37.5485,-121.9886,"Alameda County","Thibaut","Active"],
+  ["Morgan Hill Unified School District",37.1305,-121.6544,"Santa Clara County","Sofia","Lost"],
+  ["Fullerton Unified School District",33.8703,-117.9242,"Orange County","Manuel","Active"],
+  ["Hayward Unified School District",37.6688,-122.0808,"Alameda County","Joaco","Inactive - lead in conv"],
+  ["John Swett Unified School District",38.0349,-122.2302,"Contra Costa County","Manuel","Inactive - lead in conv"],
+  ["KIPP Heritage Academy",37.3382,-121.8863,"Santa Clara County","Thibaut","Inactive - no repurchase"],
+  ["KIPP Empower Academy",33.9425,-118.2437,"Los Angeles County","Thibaut","Inactive - no repurchase"],
+  ["Livermore Valley Joint Unified School District",37.6819,-121.7681,"Alameda County","Sagui","Active"],
+  ["Mill Valley Elementary School District",37.906,-122.545,"Marin County","Joaco","Lost"],
+  ["Mountain View School District",33.92,-118.105,"Los Angeles County","Thibaut","Inactive - lead in conv"],
+  ["Mt. Diablo Unified School District",37.9716,-122.0308,"Contra Costa County","Thibaut","Active"],
+  ["Mt. Pleasant Elementary School District",37.327,-121.785,"Santa Clara County","Thibaut","Active"],
+  ["Natomas Unified School District",38.6391,-121.5325,"Sacramento County","Thibaut","Active"],
+  ["Oceanside Unified School District",33.1959,-117.3795,"San Diego County","Thibaut","Inactive - lead in conv"],
+  ["Pacifica School District",37.6138,-122.4869,"San Mateo County","Manuel","Lost"],
+  ["Magnolia Public Schools",33.77,-117.855,"Orange County","Manuel","Lost"],
+  ["Palmdale School District",34.5794,-118.1165,"Los Angeles County","Thibaut","Active"],
+  ["Rosemead School District",34.0803,-118.0725,"Los Angeles County","Thibaut","Inactive - no repurchase"],
+  ["Pasadena Unified School District",34.1478,-118.1445,"Los Angeles County","Joaco","Inactive - lead in conv"],
+  ["San Bruno Park School District",37.6305,-122.4111,"San Mateo County","Nico","Active"],
+  ["San Diego Unified School District",32.7157,-117.1611,"San Diego County","Manuel","Inactive - lead in conv"],
+  ["San Jose Unified School District",37.3382,-121.8863,"Santa Clara County","Manuel","Active"],
+  ["San Mateo-Foster City School District",37.563,-122.3255,"San Mateo County","Manuel","Lost"],
+  ["Strawberry Recreation Center",37.885,-122.5063,"Marin County","Santi","Active"],
+  ["Campbell Union School District",37.2872,-121.94,"Santa Clara County","Manuel","Lost"],
+  ["Town of San Anselmo",37.9746,-122.5617,"Marin County","Santi","Active"],
+  ["Caliber Public Schools",38.1041,-122.2566,"Solano County","Manuel","Active"],
+  ["VAUGHN Next Century Learning Center",34.2231,-118.4731,"Los Angeles County","Thibaut","Active"],
+  ["Westminster School District",33.7514,-117.9939,"Orange County","Thibaut","Inactive - lead in conv"],
+  ["Fresno Unified School District",36.7378,-119.7871,"Fresno County","Manuel","Inactive - lead in conv"],
+  ["Ventura Unified School District",34.275,-119.229,"Ventura County","Manuel","Inactive - lead in conv"],
+  ["Aspire Public Schools LA",34.0195,-118.3418,"Los Angeles County","Manuel","Inactive - lead in conv"],
+  ["Lemon Grove School District",32.7418,-117.0311,"San Diego County","Manuel","Inactive - lead in conv"],
+  ["Fairfield-Suisun Unified School District",38.2493,-122.04,"Solano County","Manuel","Lost"],
+  ["Adelanto Elementary School District",34.5825,-117.4329,"San Bernardino County","Manuel","Lost"],
+  ["Albert Einstein Academies",32.7157,-117.14,"San Diego County","Manuel","Lost"],
+  ["Fresno County Superintendent of Schools",36.75,-119.77,"Fresno County","Joaco","Inactive - lead in conv"],
+  ["Vallejo City Unified School District",38.1041,-122.26,"Solano County","Manuel","Active"],
+  ["Soledad Unified School District",36.4244,-121.3266,"Monterey County","Sofia","Inactive - lead in conv"],
+  ["Firebaugh-Las Deltas Unified School District",36.856,-120.4574,"Fresno County","Sagui","Active"],
+  ["ABC Unified School District",33.8608,-118.1006,"Los Angeles County","Manuel","Lost"],
+  ["City of Milpitas",37.4323,-121.8996,"Santa Clara County","Joaco","Active"],
+  ["Monterey Peninsula Unified School District",36.6002,-121.8947,"Monterey County","Sagui","Inactive - lead in conv"],
+  ["Cuyama Joint Unified School District",34.9322,-119.593,"Santa Barbara County","Sagui","Inactive - lead in conv"],
+  ["Empire Union School District",37.6335,-120.8438,"Stanislaus County","Sagui","Active"],
+  ["Chula Vista Elementary School District",32.6401,-117.0842,"San Diego County","Thibaut","Inactive - lead in conv"],
+  ["Reed Union School District",37.885,-122.53,"Marin County","Manuel","Lost"],
+  ["Western Placer Unified School District",38.9066,-121.2717,"Placer County","Sagui","Active"],
+  ["Goleta Union School District",34.4358,-119.8276,"Santa Barbara County","Joaco","Inactive - lead in conv"],
+  ["Tehachapi Unified School District",35.1322,-118.4487,"Kern County","Joaco","Inactive - lead in conv"],
+  ["Twin Rivers Unified School District",38.6391,-121.37,"Sacramento County","Joaco","Inactive - lead in conv"],
+  ["Elk Grove Unified School District",38.4088,-121.3716,"Sacramento County","","Inactive - lead in conv"],
+  ["Rio School District",34.2289,-119.1776,"Ventura County","Manuel","Inactive - lead in conv"],
+  ["Glendora Unified School District",34.1364,-117.8653,"Los Angeles County","Joaco","Inactive - lead in conv"],
+  ["Rim of the World Unified School District",34.2439,-117.1964,"San Bernardino County","Santi","Inactive - lead in conv"],
+  ["Aromas-San Juan Unified School District",36.8877,-121.6319,"San Benito County","Santi","Inactive - lead in conv"],
+  ["Inglewood Unified School District",33.9617,-118.3531,"Los Angeles County","Juli","Active"],
+  ["South Whittier School District",33.9331,-118.0331,"Los Angeles County","Thibaut","Inactive - lead in conv"],
+  ["ISANA Academies",34.0522,-118.28,"Los Angeles County","Sagui","Active"],
+  ["Alvord Unified School District",33.8753,-117.3764,"Riverside County","Santi","Inactive - lead in conv"],
+  ["Bellflower Unified School District",33.8817,-118.117,"Los Angeles County","Santi","Inactive - lead in conv"],
+  ["Shiloh Elementary School District",40.5865,-122.3917,"Shasta County","Sagui","Active"],
+  ["Murrieta Valley Unified School District",33.5539,-117.2139,"Riverside County","Manuel","Inactive - lead in conv"],
+  ["Visalia Unified School District",36.3302,-119.2921,"Tulare County","Manuel","Active"],
+  ["Greenfield Union School District",35.2439,-119.0172,"Kern County","Manuel","Inactive - lead in conv"],
+  ["San Juan Unified School District",38.6391,-121.4263,"Sacramento County","Santi","Active"],
+  ["Stockton Unified School District",37.9577,-121.2908,"San Joaquin County","Thibaut","Inactive - lead in conv"],
+  ["Compton Unified School District",33.8958,-118.2201,"Los Angeles County","Thibaut","Inactive - lead in conv"],
+  ["Torrance Unified School District",33.8358,-118.3406,"Los Angeles County","Santi","Inactive - lead in conv"],
+  ["Del Norte County School District",41.7558,-124.2014,"Del Norte County","","Inactive - lead in conv"]
+];
+
+// ── HELPERS ───────────────────────────────────────────────────────────────────
+function norm(s) {
+  return s.toLowerCase()
+    .replace(/distirct/g,'district')
+    .replace(/unified school district/g,'').replace(/elementary school district/g,'')
+    .replace(/joint unified school district/g,'').replace(/joint unified/g,'')
+    .replace(/school district/g,'').replace(/\bunified\b/g,'').replace(/\belementary\b/g,'')
+    .replace(/\bjoint\b/g,'').replace(/\busd\b/g,'').replace(/\bpublic schools\b/g,'')
+    .replace(/\bdistrict\b/g,'').replace(/[^a-z0-9\s]/g,' ').replace(/\s+/g,' ').trim();
+}
+
+var COORDS = {};
+COORDS_RAW.forEach(function(r){ COORDS[norm(r[0])]={lat:r[1],lng:r[2],county:r[3],name:r[0]}; });
+
+function getStatusKey(raw) {
+  if (!raw) return null; var r=raw.toLowerCase().trim();
+  if (r==='active') return 'Active';
+  if (r.indexOf('lead in conv')>=0) return 'lead';
+  if (r.indexOf('no repurchase')>=0) return 'norepur';
+  if (r==='lost') return 'Lost';
+  return null;
+}
+function getAEKey(ae){ return (!ae||ae.trim()==='')?'other':(ACTIVE_AES.indexOf(ae.trim())>=0?ae.trim():'other'); }
+
+function parseCSV(text) {
+  var rows=[],lines=text.split('\n');
+  for(var i=0;i<lines.length;i++){
+    var row=[],line=lines[i].replace(/\r$/,''),inQ=false,field='';
+    for(var j=0;j<line.length;j++){var c=line[j];if(c==='"'){inQ=!inQ;}else if(c===','&&!inQ){row.push(field);field='';}else{field+=c;}}
+    row.push(field); if(row.length>1) rows.push(row);
+  }
+  return rows;
+}
+
+// ── GEO CACHE (localStorage) ──────────────────────────────────────────────────
+function loadGeoCache(){ try{return JSON.parse(localStorage.getItem(GEO_CACHE_KEY)||'{}');}catch(e){return {};} }
+function saveGeoCache(c){ try{localStorage.setItem(GEO_CACHE_KEY,JSON.stringify(c));}catch(e){} }
+
+// ── BUILD FROM CSV ────────────────────────────────────────────────────────────
+function findCoords(name) {
+  var key=norm(name), c=COORDS[key];
+  if (!c) {
+    var words=key.split(' ');
+    if(words.length>=2){var p=words.slice(0,2).join(' ');for(var k in COORDS){if(k.indexOf(p)===0){c=COORDS[k];break;}}}
+  }
+  return c||null;
+}
+
+function buildFromCSV(rows) {
+  var known=[], unmatched=[], seen={};
+  rows.slice(1).forEach(function(row){
+    if(row.length<6) return;
+    var name=(row[0]||'').trim(), area=(row[2]||'').trim().toLowerCase();
+    var county=(row[3]||'').trim(), ae=(row[4]||'').trim(), status=(row[5]||'').trim();
+    if(CA_AREAS.indexOf(area)<0) return;
+    var sk=getStatusKey(status); if(!sk) return;
+    if(seen[norm(name)]) return; seen[norm(name)]=true;
+    var c=findCoords(name);
+    if(c){
+      known.push({name:c.name,lat:c.lat,lng:c.lng,county:county||c.county,ae:ae,aeKey:getAEKey(ae),statusKey:sk});
+    } else {
+      // Check geo cache
+      var cache=loadGeoCache();
+      if(cache[name]){
+        var coords=cache[name];
+        COORDS[norm(name)]={lat:coords.lat,lng:coords.lng,county:county,name:name};
+        known.push({name:name,lat:coords.lat,lng:coords.lng,county:county,ae:ae,aeKey:getAEKey(ae),statusKey:sk});
+      } else {
+        unmatched.push({name:name,county:county,ae:ae,statusKey:sk});
+      }
+    }
+  });
+  return {known:known, unmatched:unmatched};
+}
+
+function buildFallback(){
+  return FALLBACK_RAW.map(function(r){var sk=getStatusKey(r[5]);if(!sk)return null;return{name:r[0],lat:r[1],lng:r[2],county:r[3],ae:r[4],aeKey:getAEKey(r[4]),statusKey:sk};}).filter(Boolean);
+}
+
+// ── FILTER STATE ──────────────────────────────────────────────────────────────
+var fStatus={Active:true,lead:true,norepur:true,Lost:true};
+var fAE={Thibaut:true,Manuel:true,Sagui:true,Santi:true,other:true};
+var searchTerm='',selectedName=null,districts=[];
+
+function buildFilters(id,defs,stateObj,cls){
+  var cont=document.getElementById(id);
+  defs.forEach(function(d){var btn=document.createElement('button');btn.className='fb '+cls+'-'+d.v+' on';btn.textContent=d.label;btn.onclick=function(){stateObj[d.v]=!stateObj[d.v];btn.className='fb '+cls+'-'+d.v+(stateObj[d.v]?' on':'');rerender();};cont.appendChild(btn);});
+}
+buildFilters('sf',[{v:'Active',label:'● Active'},{v:'lead',label:'● Lead'},{v:'norepur',label:'● No Repurchase'},{v:'Lost',label:'● Lost'}],fStatus,'s');
+buildFilters('af',[{v:'Thibaut',label:'Thibaut'},{v:'Manuel',label:'Manuel'},{v:'Sagui',label:'Sagui'},{v:'Santi',label:'Santi'},{v:'other',label:'Former/Unassigned'}],fAE,'ae');
+document.getElementById('si').addEventListener('input',function(e){searchTerm=e.target.value.toLowerCase().trim();rerender();});
+function isVisible(d){return fStatus[d.statusKey]&&fAE[d.aeKey]&&(!searchTerm||d.name.toLowerCase().indexOf(searchTerm)>=0);}
+
+function renderStats(){
+  var c={Active:0,lead:0,norepur:0,Lost:0};
+  districts.forEach(function(d){c[d.statusKey]++;});
+  document.getElementById('hstats').innerHTML=[['Active','#4ade80'],['lead','#fbbf24'],['norepur','#fb923c'],['Lost','#f87171']].map(function(s){return '<div class="stat"><div class="stat-n" style="color:'+s[1]+'">'+c[s[0]]+'</div><div class="stat-l">'+STATUS_LABELS[s[0]]+'</div></div>';}).join('');
+}
+
+// ── MAP ───────────────────────────────────────────────────────────────────────
+var vectorSource=new ol.source.Vector();
+var vectorLayer=new ol.layer.Vector({source:vectorSource,style:function(f){return new ol.style.Style({image:new ol.style.Circle({radius:7,fill:new ol.style.Fill({color:f.get('color')}),stroke:new ol.style.Stroke({color:'#fff',width:1.5})})});}});
+var map=new ol.Map({target:'map',layers:[new ol.layer.Tile({source:new ol.source.XYZ({url:'https://{a-d}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',attributions:'© OpenStreetMap © CARTO'})}),vectorLayer],view:new ol.View({center:ol.proj.fromLonLat([-119.5,37.0]),zoom:6})});
+var popup=document.getElementById('popup');
+var overlay=new ol.Overlay({element:popup,positioning:'bottom-center',stopEvent:false});
+map.addOverlay(overlay);
+map.on('click',function(evt){var f=map.forEachFeatureAtPixel(evt.pixel,function(f){return f;});if(f){showPopup(f.get('data'));selectedName=f.get('data').name;renderList();}else{popup.style.display='none';}});
+map.on('pointermove',function(evt){map.getTargetElement().style.cursor=map.hasFeatureAtPixel(evt.pixel)?'pointer':'';});
+
+function showPopup(d){
+  var sc=STATUS_COLORS[d.statusKey],aeColor=AE_COLORS[d.aeKey];
+  var isFormer=d.aeKey==='other'&&d.ae&&d.ae.trim()!=='';
+  var aeLabel=!d.ae||d.ae.trim()===''?'Unassigned':(isFormer?d.ae+' <span style="font-size:9px;color:#94a3b8">(former)</span>':d.ae);
+  var addr=ADDRESSES[d.name]||'';
+  popup.innerHTML='<div class="pop-name">'+d.name+'</div><span class="pop-badge" style="background:'+sc+'22;color:'+sc+';border:1px solid '+sc+'">'+STATUS_LABELS[d.statusKey]+'</span>'+(addr?'<div class="pop-row">&#x1F3E2; '+addr+'</div>':'')+'<div class="pop-row">&#x1F4CD; '+d.county+'</div><div class="pop-row"><span style="width:8px;height:8px;border-radius:50%;background:'+aeColor+';display:inline-block;flex-shrink:0"></span>'+aeLabel+'</div>';
+  popup.style.display='block';
+  overlay.setPosition(ol.proj.fromLonLat([d.lng,d.lat]));
+}
+
+function rerender(){
+  vectorSource.clear(); popup.style.display='none';
+  var visible=districts.filter(isVisible);
+  document.getElementById('lc').textContent=visible.length+' of '+districts.length+' districts';
+  visible.forEach(function(d){var f=new ol.Feature({geometry:new ol.geom.Point(ol.proj.fromLonLat([d.lng,d.lat])),color:STATUS_COLORS[d.statusKey],data:d});vectorSource.addFeature(f);});
+  renderList(visible);
+}
+function renderList(visible){
+  if(!visible) visible=districts.filter(isVisible);
+  var list=document.getElementById('dl');list.innerHTML='';
+  visible.forEach(function(d){
+    var sc=STATUS_COLORS[d.statusKey],div=document.createElement('div');
+    div.className='di'+(selectedName===d.name?' sel':'');
+    div.innerHTML='<div class="dn">'+d.name+'</div><div class="dm"><div class="sdot" style="background:'+sc+'"></div><div class="dtag">'+STATUS_LABELS[d.statusKey]+' · '+(d.ae||'Unassigned')+'</div></div>';
+    div.onclick=(function(dd){return function(){selectedName=dd.name;map.getView().animate({center:ol.proj.fromLonLat([dd.lng,dd.lat]),zoom:11,duration:500});showPopup(dd);renderList();};})(d);
+    list.appendChild(div);
+  });
+}
+
+// ── AUTO-GEOCODING ────────────────────────────────────────────────────────────
+function geocodeNext(items, idx) {
+  if (idx >= items.length) {
+    document.getElementById('geoBar').style.display = 'none';
+    return;
+  }
+  var item = items[idx];
+  var remaining = items.length - idx;
+  document.getElementById('geoBar').style.display = 'block';
+  document.getElementById('geoBar').textContent = '&#128205; Locating ' + remaining + ' new district' + (remaining>1?'s':'') + '…';
+
+  var url = 'https://nominatim.openstreetmap.org/search?q=' + encodeURIComponent(item.name + ' California') + '&format=json&limit=1&countrycodes=us';
+  fetch(url)
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      if (data && data[0]) {
+        var lat=parseFloat(data[0].lat), lng=parseFloat(data[0].lon);
+        // Save to cache
+        var cache=loadGeoCache(); cache[item.name]={lat:lat,lng:lng}; saveGeoCache(cache);
+        // Add to COORDS and districts
+        COORDS[norm(item.name)]={lat:lat,lng:lng,county:item.county,name:item.name};
+        if (!districts.some(function(d){return d.name===item.name;})) {
+          districts.push({name:item.name,lat:lat,lng:lng,county:item.county,ae:item.ae,aeKey:getAEKey(item.ae),statusKey:item.statusKey});
+          renderStats(); rerender();
+        }
+      }
+      // Respect Nominatim rate limit: 1 req/sec
+      setTimeout(function(){ geocodeNext(items, idx+1); }, 1100);
+    })
+    .catch(function(){
+      setTimeout(function(){ geocodeNext(items, idx+1); }, 1100);
+    });
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+fetch(CSV_URL + '&t=' + Date.now())
+  .then(function(r){ return r.text(); })
+  .then(function(text){
+    var rows=parseCSV(text), result=buildFromCSV(rows);
+    if (result.known.length > 5) {
+      districts = result.known;
+      document.getElementById('liveBadge').textContent = '● Live from Sheet';
+      document.getElementById('liveBadge').className = 'live-badge';
+    } else {
+      districts = buildFallback();
+      document.getElementById('liveBadge').textContent = '⚠ Fallback data';
+      document.getElementById('liveBadge').className = 'live-badge fallback';
+    }
+    renderStats(); rerender();
+    // Kick off geocoding for unknown districts
+    if (result.unmatched && result.unmatched.length > 0) {
+      geocodeNext(result.unmatched, 0);
+    }
+  })
+  .catch(function(){
+    districts=buildFallback();
+    document.getElementById('liveBadge').textContent='⚠ Fallback data';
+    document.getElementById('liveBadge').className='live-badge fallback';
+    renderStats(); rerender();
+  });
+</script>
+</body>
+</html>
